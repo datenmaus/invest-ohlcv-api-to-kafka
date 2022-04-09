@@ -23,12 +23,11 @@ class InvestingData:
             self.countries = countries
         self.products = products
 
-    @staticmethod
-    def __search(symbol: str):
+    def __search(self, symbol: str):
         search = investpy.search_quotes(
             text=symbol,
-            products=['indices'],
-            countries=['united states'],
+            products=self.products,
+            countries=self.countries,
             n_results=1
         )
         return search
@@ -39,7 +38,9 @@ class InvestingData:
         ic(search_obj)
         historical_data: Dict[str, Any] = search_obj.retrieve_historical_data("01/01/2022", "5/01/2022").reset_index().to_dict("records")
 
-
+    @staticmethod
+    def convert_date_to_pt(self, iso_date: str) -> str:
+        return " "
 
 class InvestingAPItoKafka:
 
