@@ -5,6 +5,7 @@ import time
 
 import yaml
 from icecream import ic
+from datetime import datetime
 import redis
 from rich.console import Console
 from typing import Union, List, Dict, Any
@@ -16,31 +17,52 @@ console = Console()
 
 class InvestingData:
 
-    def __init__(self, products: List[str], countries: Union[List[str], None]=None):
+    def __init__(self, products: List[str], countries: Union[List[str], None] = None):
         if countries is None:
             self.countries = ["united states"]
         else:
             self.countries = countries
         self.products = products
+        self.symbol = None
+        self.exchange = None
 
     def __search(self, symbol: str):
-        search = investpy.search_quotes(
-            text=symbol,
-            products=self.products,
-            countries=self.countries,
-            n_results=1
-        )
-        return search
+        try:
+            search = investpy.search_quotes(
+                text=symbol,
+                products=self.products,
+                countries=self.countries,
+                n_results=1
+            )
+            return search
+        except ConnectionError as re:
+            console.log("Connection error connecting to Investing.com:")
+            console.log(re)
+        except ValueError as ve:
+            console.log("Value error: wrong parameter value for search.")
+            console.log(ve)
+        return None
 
     def retrieve_historical_data(self, symbol, start_date, end_date):
+        self.symbol = symbol
         search_obj = self.__search(symbol)
-        start_date_day_first =
-        ic(search_obj)
-        historical_data: Dict[str, Any] = search_obj.retrieve_historical_data("01/01/2022", "5/01/2022").reset_index().to_dict("records")
+        if not search_obj:
+            console.log(f"FAILED acquiring search object for symbol {symbol}")
+            return None
+        self.exchange = search_obj.exchange
+        historical_data: Dict[str, Any] = search_obj.retrieve_historical_data(
+            self.convert_date_to_pt(start_date),
+            self.convert_date_to_pt(end_date)
+        ).reset_index().to_dict("records")
+        if historical_data:
+            ic(historical_data)
+            return historical_data
 
     @staticmethod
-    def convert_date_to_pt(self, iso_date: str) -> str:
-        return " "
+    def convert_date_to_pt(iso_date: str) -> str:
+        dt_obj = datetime.strptime(iso_date, "%Y-%m-%d")
+        return dt_obj.strftime("%d/%m/%Y")
+
 
 class InvestingAPItoKafka:
 
@@ -119,3 +141,34 @@ if __name__ == "__main__":
     ic(invest.stocks_list)
     ic(invest.indices_list)
     ic(invest.topic)
+    stocks = InvestingData(products=["stocks"])
+    stock_data = stocks.retrieve_historical_data(
+        symbol="TSLA",
+        start_date="2022-03-01",
+        end_date="2022-03-08"
+    )
+    ic(stock_data)
+    ic(type(stock_data))
+    console.print(f"symbol: {stocks.symbol}")
+    for datapoint in stock_data:
+        ic(datapoint["Date"])
+        datapoint["price_date"] = datetime.fromtimestamp(datapoint["Date"])
+        del datapoint["Date"]
+        datapoint["timeframe"] = "day"
+        datapoint["provider"] = "INVEST"
+        datapoint["exchange"] = stocks.exchange
+        datapoint["open"] = datapoint["Open"]
+        del datapoint["Open"]
+        datapoint["high"] = datapoint["High"]
+        del datapoint["High"]
+        datapoint["low"] = datapoint["Low"]
+        del datapoint["Low"]
+        datapoint["close"] = datapoint["Close"]
+        del datapoint["Close"]
+        datapoint["volume"] = datapoint["Volume"]
+        ic(datapoint)
+
+
+
+
+
