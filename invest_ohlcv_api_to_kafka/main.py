@@ -218,17 +218,8 @@ if __name__ == "__main__":
     ic(invest.stocks_list)
     ic(invest.indices_list)
     ic(invest.topic)
-    #stocks = InvestingData(products=["stocks"])
-    # stock_data = stocks.retrieve_historical_data(
-    #     symbol="TSLA",
-    #     start_date="2022-03-01",
-    #     end_date="2022-03-08"
-    # )
-    # ic(stock_data)
-    # ic(type(stock_data))
-
     invest.retrieve_data(start_date="2022-02-01", end_date="2022-02-05")
-    # console.print(f"symbol: {stocks.symbol}")
+    console.log("Finished.", style="green")
 
 
 
