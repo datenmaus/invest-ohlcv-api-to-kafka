@@ -1,5 +1,7 @@
 from environs import Env
 import os
+import socket
+
 env = Env()
 
 REDIS_HOST = env.str("REDIS_HOST", "localhost")
@@ -11,6 +13,23 @@ REDIS_PASSWORD = env.str("REDIS_PASSWORD", None)
 INVEST_INTERVAL = env.str("INVEST_INTERVAL", "Daily")
 
 ATS_VERBOSE_LOGGING = env.bool("ATS_VERBOSE_LOGGING", True)
+
+RUNNING_IN_CONTAINER = env.bool("RUNNING_IN_CONTAINER", False)
+
+KAFKA_BROKER = env.str("KAFKA_BROKER")
+KAFKA_BOOTSTRAP_SERVERS = KAFKA_BROKER
+KAFKA_CONFIGURATION = {
+    'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
+    # 'client.id': socket.gethostname(),
+    'socket.timeout.ms': 10000,
+    'api.version.request': 'false',
+}
+
+HOSTNAMEY = env.str("HOSTNAMEY", None)
+HOSTNAMEALIAS2 = env.str("HOSTNAMEALIAS2", None)
+if not HOSTNAMEALIAS2 and HOSTNAMEY:
+    HOSTNAMEALIAS2 = HOSTNAMEY
+
 
 class RetryTime:
     def __init__(self):

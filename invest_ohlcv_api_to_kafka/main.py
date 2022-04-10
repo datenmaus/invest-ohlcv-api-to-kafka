@@ -2,6 +2,8 @@
 
 import os
 import time
+import uuid
+from kafka import KafkaProducer, errors
 import orjson
 import yaml
 from icecream import ic
@@ -76,6 +78,7 @@ class InvestingAPItoKafka:
 
     def __init__(self):
         self.topic: str = "invest.events.ohlcv.queue"
+        self.kafka_producer = None
         self.stocks_list: Union[List[str], None] = None
         self.etfs_list: Union[List[str], None] = None
         self.indices_list: Union[List[str], None] = None
@@ -110,7 +113,7 @@ class InvestingAPItoKafka:
 
     def get_symbols_list_from_file(self) -> None:
         selected_symbols_config_file: Union[str, None] = None
-        symbols_config_file = "/etc/config/INVEST-SYMBOLS"
+        symbols_config_file = "/etc/config/INVEST"
         symbols_local_file = "default_tickers.yaml"
         while not selected_symbols_config_file:
             if not os.path.isfile(symbols_config_file):
@@ -135,7 +138,6 @@ class InvestingAPItoKafka:
                     self.stocks_list = all_symbols["invest-stocks"]
                     self.etfs_list = all_symbols["invest-etfs"]
                     self.indices_list = all_symbols["invest-indices"]
-                    self.topic = all_symbols["invest-ohlcv-events-queue"]
                     ic(all_symbols)
                 except yaml.YAMLError as ye:
                     console.print(f"ERROR parsing the yaml file {selected_symbols_config_file}", style="bold yellow")
@@ -146,19 +148,69 @@ class InvestingAPItoKafka:
     def retrieve_data(self, start_date: str, end_date: str):
         # Stocks
         stocks = InvestingData(products=["stocks"])
+        ic(self.stocks_list)
         for ticker in self.stocks_list:
-            console.log(f"Retrieving hist data for symbol {ticker}")
-            stock_data_list = stocks.retrieve_historical_data(symbol=ticker, start_date=start_date, end_date=end_date)
-            self.publish_data(symbol=ticker, datapoints=stock_data_list)
+            ticker_only = ticker.split(":")[1]
+            console.log(f"Retrieving hist data for symbol {ticker_only}")
+            stock_data_list = stocks.retrieve_historical_data(symbol=ticker_only, start_date=start_date, end_date=end_date)
+            self.publish_data(symbol=ticker_only, exchange=stocks.exchange, datapoints=stock_data_list)
 
-    def publish_data(self, symbol: str, datapoints: List[Dict[str, Any]]) -> None:
+    def publish_data(self, symbol: str, exchange: str, datapoints: List[Dict[str, Any]]) -> None:
         if not datapoints or len(datapoints) == 0:
-            console.log(f"Warning! Empty datapoints list for symbol {symbol} - nothing to publish")
+            console.log(f"Warning! No datapoint for symbol {symbol} - nothing to publish.")
             return None
         topics = Topic()
-        for topic in topics:
-            console.print(f"Publishing to {topic}")
-        return None
+        if not self.kafka_producer:
+            self.open_kafka_connection()
+        for bar in datapoints:
+            bar["id"] = uuid.uuid4()
+            bar["provider"] = "INVEST"
+            bar["timeframe"] = "day"
+            bar["symbol"] = symbol
+            bar["price_date"] = datetime.strptime(bar["Date"].split("T")[0], '%Y-%m-%d')
+            del bar["Date"]
+            bar["exchange"] = exchange
+            bar["open"] = bar["Open"]
+            del bar["Open"]
+            bar["high"] = bar["High"]
+            del bar["High"]
+            bar["low"] = bar["Low"]
+            del bar["Low"]
+            bar["close"] = bar["Close"]
+            del bar["Close"]
+            bar["volume"] = bar["Volume"]
+            del bar["Volume"]
+            del bar["Change Pct"]
+            bar["u_open"] = None
+            bar["u_high"] = None
+            bar["u_low"] = None
+            bar["u_close"] = None
+            bar["u_volume"] = None
+            bar["vwap"] = None
+            bar["trade_count"] = None
+            bar["currency"] = "USD"
+            bar["dividend_amount"] = None
+            bar["split_coefficient"] = None
+            bar["alt_symbol"] = None
+            ic(bar)
+            for topic_name in topics.topics_list:
+                console.print(f"Publishing to {topic_name}, symbol:{symbol}, datapoint: {bar['price_date']}")
+                self.kafka_producer.send(topic_name, value=bar)
+        self.kafka_producer.flush()
+
+    def open_kafka_connection(self):
+        while not self.kafka_producer:
+            try:
+                self.kafka_producer = KafkaProducer(
+                    bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
+                    value_serializer=lambda v: orjson.dumps(v),
+                )
+                console.print(f"Connection opened to Kafka on {config.KAFKA_BOOTSTRAP_SERVERS}", style="green")
+            except errors.NoBrokersAvailable as ke_nba:
+                console.log(f"FAILED to connect to Kafka brokers: {config.KAFKA_BOOTSTRAP_SERVERS}")
+                console.log(ke_nba)
+                console.log(f"Sleeping for {config.RETRY_TIME.ServiceUnavailable} seconds...")
+                time.sleep(config.RETRY_TIME.ServiceUnavailable)
 
 
 if __name__ == "__main__":
@@ -166,15 +218,17 @@ if __name__ == "__main__":
     ic(invest.stocks_list)
     ic(invest.indices_list)
     ic(invest.topic)
-    stocks = InvestingData(products=["stocks"])
-    stock_data = stocks.retrieve_historical_data(
-        symbol="TSLA",
-        start_date="2022-03-01",
-        end_date="2022-03-08"
-    )
-    ic(stock_data)
-    ic(type(stock_data))
-    console.print(f"symbol: {stocks.symbol}")
+    #stocks = InvestingData(products=["stocks"])
+    # stock_data = stocks.retrieve_historical_data(
+    #     symbol="TSLA",
+    #     start_date="2022-03-01",
+    #     end_date="2022-03-08"
+    # )
+    # ic(stock_data)
+    # ic(type(stock_data))
+
+    invest.retrieve_data(start_date="2022-02-01", end_date="2022-02-05")
+    # console.print(f"symbol: {stocks.symbol}")
 
 
 

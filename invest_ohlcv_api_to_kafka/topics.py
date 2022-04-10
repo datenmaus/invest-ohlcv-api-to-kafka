@@ -13,7 +13,7 @@ class Topic:
         self.topics_list = self.get_topics_from_file()
 
     @staticmethod
-    def get_topics_from_file(self):
+    def get_topics_from_file():
         selected_topics_config_file = None
         topics_config_file = "/etc/config/INVEST-TOPICS"
         topics_default_file = "default_topics.yaml"
