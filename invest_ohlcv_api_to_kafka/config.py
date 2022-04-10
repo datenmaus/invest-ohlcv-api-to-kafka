@@ -10,6 +10,7 @@ REDIS_PASSWORD = env.str("REDIS_PASSWORD", None)
 
 INVEST_INTERVAL = env.str("INVEST_INTERVAL", "Daily")
 
+ATS_VERBOSE_LOGGING = env.bool("ATS_VERBOSE_LOGGING", True)
 
 class RetryTime:
     def __init__(self):

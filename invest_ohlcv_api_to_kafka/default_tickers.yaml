@@ -1,5 +1,3 @@
-invest-ohlcv-events-queue:
-  - 'invest.events.ohlcv.queue'
 invest-stocks:
   - 'united states:AAPL'
   - 'united states:NVDA'

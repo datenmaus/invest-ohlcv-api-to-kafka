@@ -2,7 +2,7 @@
 
 import os
 import time
-
+import orjson
 import yaml
 from icecream import ic
 from datetime import datetime
@@ -10,7 +10,9 @@ import redis
 from rich.console import Console
 from typing import Union, List, Dict, Any
 import config
+from topics import Topic
 import investpy
+import pandas as pd
 
 console = Console()
 
@@ -43,20 +45,26 @@ class InvestingData:
             console.log(ve)
         return None
 
-    def retrieve_historical_data(self, symbol, start_date, end_date):
+    def retrieve_historical_data(self, symbol, start_date, end_date) -> List[Dict[str, Any]]:
         self.symbol = symbol
         search_obj = self.__search(symbol)
         if not search_obj:
             console.log(f"FAILED acquiring search object for symbol {symbol}")
-            return None
+            return []
         self.exchange = search_obj.exchange
-        historical_data: Dict[str, Any] = search_obj.retrieve_historical_data(
-            self.convert_date_to_pt(start_date),
-            self.convert_date_to_pt(end_date)
-        ).reset_index().to_dict("records")
-        if historical_data:
-            ic(historical_data)
-            return historical_data
+        try:
+            historical_data_json = search_obj.retrieve_historical_data(
+                self.convert_date_to_pt(start_date),
+                self.convert_date_to_pt(end_date)
+            ).reset_index().to_json(orient="records", date_format="iso")
+            return orjson.loads(historical_data_json)
+        except RuntimeError as re:
+            console.log(f"Failed retrieving historical data for symbol {symbol} from investing.com")
+            console.log(re)
+        except ValueError as ve:
+            console.log(f"Invalid parameters to retrieve historical. (symbol:{symbol})")
+            console.log(ve)
+        return []
 
     @staticmethod
     def convert_date_to_pt(iso_date: str) -> str:
@@ -102,7 +110,7 @@ class InvestingAPItoKafka:
 
     def get_symbols_list_from_file(self) -> None:
         selected_symbols_config_file: Union[str, None] = None
-        symbols_config_file = "/etc/config/INVEST"
+        symbols_config_file = "/etc/config/INVEST-SYMBOLS"
         symbols_local_file = "default_tickers.yaml"
         while not selected_symbols_config_file:
             if not os.path.isfile(symbols_config_file):
@@ -117,7 +125,7 @@ class InvestingAPItoKafka:
                     selected_symbols_config_file = symbols_local_file
             else:
                 selected_symbols_config_file = symbols_config_file
-            valid_config_file = False
+        valid_config_file = False
         console.print(f"Parsing {selected_symbols_config_file}...")
         while not valid_config_file:
             with open(selected_symbols_config_file, "r") as yaml_symbols_file:
@@ -135,6 +143,23 @@ class InvestingAPItoKafka:
                     console.log(f"Sleeping for {config.RETRY_TIME.ConfigurationError} seconds.")
                     time.sleep(config.RETRY_TIME.ConfigurationError)
 
+    def retrieve_data(self, start_date: str, end_date: str):
+        # Stocks
+        stocks = InvestingData(products=["stocks"])
+        for ticker in self.stocks_list:
+            console.log(f"Retrieving hist data for symbol {ticker}")
+            stock_data_list = stocks.retrieve_historical_data(symbol=ticker, start_date=start_date, end_date=end_date)
+            self.publish_data(symbol=ticker, datapoints=stock_data_list)
+
+    def publish_data(self, symbol: str, datapoints: List[Dict[str, Any]]) -> None:
+        if not datapoints or len(datapoints) == 0:
+            console.log(f"Warning! Empty datapoints list for symbol {symbol} - nothing to publish")
+            return None
+        topics = Topic()
+        for topic in topics:
+            console.print(f"Publishing to {topic}")
+        return None
+
 
 if __name__ == "__main__":
     invest = InvestingAPItoKafka()
@@ -150,23 +175,6 @@ if __name__ == "__main__":
     ic(stock_data)
     ic(type(stock_data))
     console.print(f"symbol: {stocks.symbol}")
-    for datapoint in stock_data:
-        ic(datapoint["Date"])
-        datapoint["price_date"] = datetime.fromtimestamp(datapoint["Date"])
-        del datapoint["Date"]
-        datapoint["timeframe"] = "day"
-        datapoint["provider"] = "INVEST"
-        datapoint["exchange"] = stocks.exchange
-        datapoint["open"] = datapoint["Open"]
-        del datapoint["Open"]
-        datapoint["high"] = datapoint["High"]
-        del datapoint["High"]
-        datapoint["low"] = datapoint["Low"]
-        del datapoint["Low"]
-        datapoint["close"] = datapoint["Close"]
-        del datapoint["Close"]
-        datapoint["volume"] = datapoint["Volume"]
-        ic(datapoint)
 
 
 
