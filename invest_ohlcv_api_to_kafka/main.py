@@ -77,7 +77,6 @@ class InvestingData:
 class InvestingAPItoKafka:
 
     def __init__(self):
-        self.topic: str = "invest.events.ohlcv.queue"
         self.kafka_producer = None
         self.stocks_list: Union[List[str], None] = None
         self.etfs_list: Union[List[str], None] = None
@@ -154,6 +153,13 @@ class InvestingAPItoKafka:
             console.log(f"Retrieving hist data for symbol {ticker_only}")
             stock_data_list = stocks.retrieve_historical_data(symbol=ticker_only, start_date=start_date, end_date=end_date)
             self.publish_data(symbol=ticker_only, exchange=stocks.exchange, datapoints=stock_data_list)
+        indices = InvestingData(products=["indices"])
+        ic(self.indices_list)
+        for index in self.indices_list:
+            ix_symbol_only = index.split(":")[1]
+            console.log(f"Retrieving hist data for symbol {ix_symbol_only}")
+            indice_data = indices.retrieve_historical_data(symbol=ix_symbol_only, start_date=start_date, end_date=end_date)
+            self.publish_data(symbol=ix_symbol_only, exchange=indices.exchange, datapoints=indice_data)
 
     def publish_data(self, symbol: str, exchange: str, datapoints: List[Dict[str, Any]]) -> None:
         if not datapoints or len(datapoints) == 0:
@@ -217,7 +223,8 @@ if __name__ == "__main__":
     invest = InvestingAPItoKafka()
     ic(invest.stocks_list)
     ic(invest.indices_list)
-    ic(invest.topic)
+    t = Topic()
+    ic(t.topics_list)
     invest.retrieve_data(start_date="2022-02-01", end_date="2022-02-05")
     console.log("Finished.", style="green")
 
