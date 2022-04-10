@@ -3,11 +3,13 @@
 import os
 import time
 import uuid
+
+import click
 from kafka import KafkaProducer, errors
 import orjson
 import yaml
 from icecream import ic
-from datetime import datetime
+from datetime import datetime, timedelta
 import redis
 from rich.console import Console
 from typing import Union, List, Dict, Any
@@ -158,8 +160,27 @@ class InvestingAPItoKafka:
         for index in self.indices_list:
             ix_symbol_only = index.split(":")[1]
             console.log(f"Retrieving hist data for symbol {ix_symbol_only}")
-            indice_data = indices.retrieve_historical_data(symbol=ix_symbol_only, start_date=start_date, end_date=end_date)
+            indice_data = indices.retrieve_historical_data(
+                symbol=ix_symbol_only,
+                start_date=start_date,
+                end_date=end_date
+            )
             self.publish_data(symbol=ix_symbol_only, exchange=indices.exchange, datapoints=indice_data)
+        etfs = InvestingData(products=["etfs"])
+        ic(self.etfs_list)
+        for etf_symbol in self.etfs_list:
+            ticker_only = etf_symbol.split(":")[1]
+            console.log(f"Retrieving hist data for symbol {ticker_only}")
+            etfs_data = etfs.retrieve_historical_data(
+                symbol=etf_symbol,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            self.publish_data(
+                symbol=ticker_only,
+                exchange=etfs.exchange,
+                datapoints=etfs_data
+            )
 
     def publish_data(self, symbol: str, exchange: str, datapoints: List[Dict[str, Any]]) -> None:
         if not datapoints or len(datapoints) == 0:
@@ -219,14 +240,37 @@ class InvestingAPItoKafka:
                 time.sleep(config.RETRY_TIME.ServiceUnavailable)
 
 
-if __name__ == "__main__":
+@click.command()
+@click.option(
+    "--start", "-s", help="Start date (YYYY-MM-DD).",
+)
+@click.option("--end", "-e", help="End date (YYYY-MM-DD)")
+def main(start: str, end:str):
+    console.log(f"Starting {os.path.basename(__file__)}")
+    yesterday_dt: datetime = datetime.today() - timedelta(days=1)
+    if not start and not end:
+        end = str(yesterday_dt.date())
+        one_week_ago = yesterday_dt - timedelta(weeks=1)
+        start = str(one_week_ago.date())
+    elif start and not end:
+        end = str(yesterday_dt.date())
+    elif end and not start:
+        four_years_ago = yesterday_dt - timedelta(weeks=208)
+        start_dt = datetime(four_years_ago.year, 1, 1, 0, 0, 0)
+        start = str(start_dt.date())
+    console.print(f"Start date:\t{start}\t\tEnd date:\t{end}", style="bold")
     invest = InvestingAPItoKafka()
     ic(invest.stocks_list)
     ic(invest.indices_list)
     t = Topic()
     ic(t.topics_list)
-    invest.retrieve_data(start_date="2022-02-01", end_date="2022-02-05")
+    # invest.retrieve_data(start_date="2022-02-01", end_date="2022-02-05")
     console.log("Finished.", style="green")
+
+
+if __name__ == "__main__":
+    main()
+
 
 
 
