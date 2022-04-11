@@ -149,7 +149,6 @@ class InvestingAPItoKafka:
         stocks = InvestingData(products=["stocks"])
         ic(self.stocks_list)
         for ticker in self.stocks_list:
-            ic(type(ticker))
             ticker_only = ticker.split(":")[1]
             console.log(f"Retrieving hist data for symbol {ticker_only}")
             stock_data_list = stocks.retrieve_historical_data(
@@ -218,11 +217,11 @@ class InvestingAPItoKafka:
             bar["dividend_amount"] = None
             bar["split_coefficient"] = None
             bar["alt_symbol"] = None
-            ic(bar)
+            ic(bar) if config.ATS_VERBOSE_LOGGING else None
+            console.print(
+                f"Publishing symbol:{symbol}, datapoint: {bar['price_date'].date()}"
+            )
             for topic_name in topics.topics_list:
-                console.print(
-                    f"Publishing to {topic_name}, symbol:{symbol}, datapoint: {bar['price_date']}"
-                )
                 self.kafka_producer.send(topic_name, value=bar)
         self.kafka_producer.flush()
 
@@ -267,9 +266,10 @@ def main(start: str, end: str):
     invest = InvestingAPItoKafka()
     ic(invest.stocks_list)
     ic(invest.indices_list)
+    ic(invest.etfs_list)
     t = Topic()
     ic(t.topics_list)
-    invest.retrieve_data(start_date="2022-02-01", end_date="2022-02-05")
+    invest.retrieve_data(start_date=start, end_date=end)
     console.log("Finished.", style="green")
 
 
