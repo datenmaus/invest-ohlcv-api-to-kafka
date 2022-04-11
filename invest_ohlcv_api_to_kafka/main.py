@@ -3,6 +3,7 @@
 import os
 import time
 import uuid
+import random
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Union
 
@@ -157,6 +158,7 @@ class InvestingAPItoKafka:
             self.publish_data(
                 symbol=ticker_only, exchange=stocks.exchange, datapoints=stock_data_list
             )
+            time.sleep(random.randint(0, config.MAX_PAUSE_BETWEEN_REQUESTS))
         indices = InvestingData(products=["indices"])
         ic(self.indices_list)
         for index in self.indices_list:
@@ -168,6 +170,7 @@ class InvestingAPItoKafka:
             self.publish_data(
                 symbol=ix_symbol_only, exchange=indices.exchange, datapoints=indice_data
             )
+            time.sleep(random.randint(0, config.MAX_PAUSE_BETWEEN_REQUESTS))
         etfs = InvestingData(products=["etfs"])
         ic(self.etfs_list)
         for etf_symbol in self.etfs_list:
@@ -179,6 +182,7 @@ class InvestingAPItoKafka:
                 end_date=end_date,
             )
             self.publish_data(symbol=ticker_only, exchange=etfs.exchange, datapoints=etfs_data)
+            time.sleep(random.randint(0, config.MAX_PAUSE_BETWEEN_REQUESTS))
 
     def publish_data(self, symbol: str, exchange: str, datapoints: List[Dict[str, Any]]) -> None:
         if not datapoints or len(datapoints) == 0:
