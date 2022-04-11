@@ -1,0 +1,8 @@
+invest-stocks:
+  - 'united states:ABNB'
+  - 'united states:VIRT'
+invest-etfs:
+  - 'united states:SOXX'
+invest-indices:
+  - 'united states:SPX'
+  - 'united states:RUT'
