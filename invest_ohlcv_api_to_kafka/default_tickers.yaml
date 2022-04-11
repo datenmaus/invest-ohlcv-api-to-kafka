@@ -1,8 +1,20 @@
 invest-stocks:
+  - 'united states:AAPL'
+  - 'united states:NVDA'
+  - 'united states:LAC'
+  - 'united states:TSLA'
+  - 'united states:FDS'
+  - 'united states:NU'
+  - 'united states:AMD'
   - 'united states:ABNB'
   - 'united states:VIRT'
 invest-etfs:
   - 'united states:SOXX'
 invest-indices:
   - 'united states:SPX'
+  - 'united states:VVIX'
+  - 'united states:SPCOMT'
+  - 'united states:SPCOMD'
   - 'united states:RUT'
+  - 'united states:QMI'
+  - 'united states:QIV'
