@@ -1,6 +1,4 @@
 from environs import Env
-import os
-import socket
 
 env = Env()
 
@@ -19,10 +17,10 @@ RUNNING_IN_CONTAINER = env.bool("RUNNING_IN_CONTAINER", False)
 KAFKA_BROKER = env.str("KAFKA_BROKER")
 KAFKA_BOOTSTRAP_SERVERS = KAFKA_BROKER
 KAFKA_CONFIGURATION = {
-    'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
+    "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
     # 'client.id': socket.gethostname(),
-    'socket.timeout.ms': 10000,
-    'api.version.request': 'false',
+    "socket.timeout.ms": 10000,
+    "api.version.request": "false",
 }
 
 HOSTNAMEY = env.str("HOSTNAMEY", None)

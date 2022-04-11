@@ -1,14 +1,14 @@
-import yaml
 import os
-from rich.console import Console
-import config
 import time
+
+import config
+import yaml
+from rich.console import Console
 
 console = Console()
 
 
 class Topic:
-
     def __init__(self):
         self.topics_list = self.get_topics_from_file()
 
@@ -22,7 +22,10 @@ class Topic:
                 console.print(f"{topics_config_file} not found.")
                 console.print(f"Trying the local {topics_default_file} file...")
                 if not os.path.isfile(topics_default_file):
-                    console.print(f"Local file {topics_default_file} not found - unable to continue.", style="yellow")
+                    console.print(
+                        f"Local file {topics_default_file} not found - unable to continue.",
+                        style="yellow",
+                    )
                     console.print(f"Sleeping for {config.RETRY_TIME.FileNotFound} seconds...")
                     time.sleep(config.RETRY_TIME.FileNotFound)
                 else:
@@ -40,9 +43,13 @@ class Topic:
                         valid_config_file = True
                         return all_topics["invest-ohlcv-topics"]
                     except yaml.YAMLError as ye:
-                        console.print(f"ERROR parsing topics YAML file: {selected_topics_config_file}")
+                        console.print(
+                            f"ERROR parsing topics YAML file: {selected_topics_config_file}"
+                        )
                         console.print(ye)
-                        console.log(f"Sleeping for {config.RETRY_TIME.ConfigurationError} seconds...")
+                        console.log(
+                            f"Sleeping for {config.RETRY_TIME.ConfigurationError} seconds..."
+                        )
                         time.sleep(config.RETRY_TIME.ConfigurationError)
             except Exception as ex:
                 console.print(f"ERROR opening {selected_topics_config_file} file.")

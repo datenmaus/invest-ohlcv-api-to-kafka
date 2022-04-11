@@ -3,26 +3,24 @@
 import os
 import time
 import uuid
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Union
 
 import click
-from kafka import KafkaProducer, errors
+import config
+import investpy
 import orjson
+import redis
 import yaml
 from icecream import ic
-from datetime import datetime, timedelta
-import redis
+from kafka import KafkaProducer, errors
 from rich.console import Console
-from typing import Union, List, Dict, Any
-import config
 from topics import Topic
-import investpy
-import pandas as pd
 
 console = Console()
 
 
 class InvestingData:
-
     def __init__(self, products: List[str], countries: Union[List[str], None] = None):
         if countries is None:
             self.countries = ["united states"]
@@ -35,10 +33,7 @@ class InvestingData:
     def __search(self, symbol: str):
         try:
             search = investpy.search_quotes(
-                text=symbol,
-                products=self.products,
-                countries=self.countries,
-                n_results=1
+                text=symbol, products=self.products, countries=self.countries, n_results=1
             )
             return search
         except ConnectionError as re:
@@ -57,10 +52,13 @@ class InvestingData:
             return []
         self.exchange = search_obj.exchange
         try:
-            historical_data_json = search_obj.retrieve_historical_data(
-                self.convert_date_to_pt(start_date),
-                self.convert_date_to_pt(end_date)
-            ).reset_index().to_json(orient="records", date_format="iso")
+            historical_data_json = (
+                search_obj.retrieve_historical_data(
+                    self.convert_date_to_pt(start_date), self.convert_date_to_pt(end_date)
+                )
+                .reset_index()
+                .to_json(orient="records", date_format="iso")
+            )
             return orjson.loads(historical_data_json)
         except RuntimeError as re:
             console.log(f"Failed retrieving historical data for symbol {symbol} from investing.com")
@@ -77,7 +75,6 @@ class InvestingData:
 
 
 class InvestingAPItoKafka:
-
     def __init__(self):
         self.kafka_producer = None
         self.stocks_list: Union[List[str], None] = None
@@ -88,11 +85,9 @@ class InvestingAPItoKafka:
     def get_symbols(self) -> None:
         self.get_symbols_list_from_redis()
         if (
-                not self.stocks_list or len(self.stocks_list) == 0
-        ) and (
-                not self.etfs_list or len(self.etfs_list) == 0
-        ) and (
-                not self.indices_list or len(self.indices_list) == 0
+            (not self.stocks_list or len(self.stocks_list) == 0)
+            and (not self.etfs_list or len(self.etfs_list) == 0)
+            and (not self.indices_list or len(self.indices_list) == 0)
         ):
             self.get_symbols_list_from_file()
 
@@ -103,7 +98,7 @@ class InvestingAPItoKafka:
                 port=config.REDIS_PORT,
                 db=config.REDIS_DB,
                 username=config.REDIS_USERNAME if config.REDIS_HOST != "localhost" else None,
-                password=config.REDIS_PASSWORD if config.REDIS_HOST != "localhost" else None
+                password=config.REDIS_PASSWORD if config.REDIS_HOST != "localhost" else None,
             )
             self.stocks_list = r.smembers("INVEST-STOCKS")
             self.etfs_list = r.smembers("INVEST-ETFS")
@@ -141,7 +136,10 @@ class InvestingAPItoKafka:
                     self.indices_list = all_symbols["invest-indices"]
                     ic(all_symbols)
                 except yaml.YAMLError as ye:
-                    console.print(f"ERROR parsing the yaml file {selected_symbols_config_file}", style="bold yellow")
+                    console.print(
+                        f"ERROR parsing the yaml file {selected_symbols_config_file}",
+                        style="bold yellow",
+                    )
                     console.print(ye)
                     console.log(f"Sleeping for {config.RETRY_TIME.ConfigurationError} seconds.")
                     time.sleep(config.RETRY_TIME.ConfigurationError)
@@ -151,36 +149,37 @@ class InvestingAPItoKafka:
         stocks = InvestingData(products=["stocks"])
         ic(self.stocks_list)
         for ticker in self.stocks_list:
+            ic(type(ticker))
             ticker_only = ticker.split(":")[1]
             console.log(f"Retrieving hist data for symbol {ticker_only}")
-            stock_data_list = stocks.retrieve_historical_data(symbol=ticker_only, start_date=start_date, end_date=end_date)
-            self.publish_data(symbol=ticker_only, exchange=stocks.exchange, datapoints=stock_data_list)
+            stock_data_list = stocks.retrieve_historical_data(
+                symbol=ticker_only, start_date=start_date, end_date=end_date
+            )
+            self.publish_data(
+                symbol=ticker_only, exchange=stocks.exchange, datapoints=stock_data_list
+            )
         indices = InvestingData(products=["indices"])
         ic(self.indices_list)
         for index in self.indices_list:
             ix_symbol_only = index.split(":")[1]
             console.log(f"Retrieving hist data for symbol {ix_symbol_only}")
             indice_data = indices.retrieve_historical_data(
-                symbol=ix_symbol_only,
-                start_date=start_date,
-                end_date=end_date
+                symbol=ix_symbol_only, start_date=start_date, end_date=end_date
             )
-            self.publish_data(symbol=ix_symbol_only, exchange=indices.exchange, datapoints=indice_data)
+            self.publish_data(
+                symbol=ix_symbol_only, exchange=indices.exchange, datapoints=indice_data
+            )
         etfs = InvestingData(products=["etfs"])
         ic(self.etfs_list)
         for etf_symbol in self.etfs_list:
             ticker_only = etf_symbol.split(":")[1]
             console.log(f"Retrieving hist data for symbol {ticker_only}")
             etfs_data = etfs.retrieve_historical_data(
-                symbol=etf_symbol,
+                symbol=ticker_only,
                 start_date=start_date,
                 end_date=end_date,
             )
-            self.publish_data(
-                symbol=ticker_only,
-                exchange=etfs.exchange,
-                datapoints=etfs_data
-            )
+            self.publish_data(symbol=ticker_only, exchange=etfs.exchange, datapoints=etfs_data)
 
     def publish_data(self, symbol: str, exchange: str, datapoints: List[Dict[str, Any]]) -> None:
         if not datapoints or len(datapoints) == 0:
@@ -194,7 +193,7 @@ class InvestingAPItoKafka:
             bar["provider"] = "INVEST"
             bar["timeframe"] = "day"
             bar["symbol"] = symbol
-            bar["price_date"] = datetime.strptime(bar["Date"].split("T")[0], '%Y-%m-%d')
+            bar["price_date"] = datetime.strptime(bar["Date"].split("T")[0], "%Y-%m-%d")
             del bar["Date"]
             bar["exchange"] = exchange
             bar["open"] = bar["Open"]
@@ -221,7 +220,9 @@ class InvestingAPItoKafka:
             bar["alt_symbol"] = None
             ic(bar)
             for topic_name in topics.topics_list:
-                console.print(f"Publishing to {topic_name}, symbol:{symbol}, datapoint: {bar['price_date']}")
+                console.print(
+                    f"Publishing to {topic_name}, symbol:{symbol}, datapoint: {bar['price_date']}"
+                )
                 self.kafka_producer.send(topic_name, value=bar)
         self.kafka_producer.flush()
 
@@ -232,7 +233,9 @@ class InvestingAPItoKafka:
                     bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
                     value_serializer=lambda v: orjson.dumps(v),
                 )
-                console.print(f"Connection opened to Kafka on {config.KAFKA_BOOTSTRAP_SERVERS}", style="green")
+                console.print(
+                    f"Connection opened to Kafka on {config.KAFKA_BOOTSTRAP_SERVERS}", style="green"
+                )
             except errors.NoBrokersAvailable as ke_nba:
                 console.log(f"FAILED to connect to Kafka brokers: {config.KAFKA_BOOTSTRAP_SERVERS}")
                 console.log(ke_nba)
@@ -242,10 +245,12 @@ class InvestingAPItoKafka:
 
 @click.command()
 @click.option(
-    "--start", "-s", help="Start date (YYYY-MM-DD).",
+    "--start",
+    "-s",
+    help="Start date (YYYY-MM-DD).",
 )
 @click.option("--end", "-e", help="End date (YYYY-MM-DD)")
-def main(start: str, end:str):
+def main(start: str, end: str):
     console.log(f"Starting {os.path.basename(__file__)}")
     yesterday_dt: datetime = datetime.today() - timedelta(days=1)
     if not start and not end:
@@ -264,15 +269,9 @@ def main(start: str, end:str):
     ic(invest.indices_list)
     t = Topic()
     ic(t.topics_list)
-    # invest.retrieve_data(start_date="2022-02-01", end_date="2022-02-05")
+    invest.retrieve_data(start_date="2022-02-01", end_date="2022-02-05")
     console.log("Finished.", style="green")
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
