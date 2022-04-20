@@ -29,6 +29,7 @@ class InvestingData:
             self.countries = countries
         self.products = products
         self.symbol = None
+        self.name = None
         self.exchange = None
 
     def __search(self, symbol: str):
@@ -52,6 +53,7 @@ class InvestingData:
             console.log(f"FAILED acquiring search object for symbol {symbol}")
             return []
         self.exchange = search_obj.exchange
+        self.name = search_obj.name
         try:
             historical_data_json = (
                 search_obj.retrieve_historical_data(
@@ -156,7 +158,10 @@ class InvestingAPItoKafka:
                 symbol=ticker_only, start_date=start_date, end_date=end_date
             )
             self.publish_data(
-                symbol=ticker_only, exchange=stocks.exchange, datapoints=stock_data_list
+                symbol=ticker_only,
+                exchange=stocks.exchange,
+                name=stocks.name,
+                datapoints=stock_data_list
             )
             time.sleep(random.randint(0, config.MAX_PAUSE_BETWEEN_REQUESTS))
         indices = InvestingData(products=["indices"])
@@ -165,10 +170,15 @@ class InvestingAPItoKafka:
             ix_symbol_only = index.split(":")[1]
             console.log(f"Retrieving hist data for symbol {ix_symbol_only}")
             indice_data = indices.retrieve_historical_data(
-                symbol=ix_symbol_only, start_date=start_date, end_date=end_date
+                symbol=ix_symbol_only,
+                start_date=start_date,
+                end_date=end_date
             )
             self.publish_data(
-                symbol=ix_symbol_only, exchange=indices.exchange, datapoints=indice_data
+                symbol=ix_symbol_only,
+                exchange=indices.exchange,
+                name=indices.name,
+                datapoints=indice_data
             )
             time.sleep(random.randint(0, config.MAX_PAUSE_BETWEEN_REQUESTS))
         etfs = InvestingData(products=["etfs"])
@@ -181,10 +191,14 @@ class InvestingAPItoKafka:
                 start_date=start_date,
                 end_date=end_date,
             )
-            self.publish_data(symbol=ticker_only, exchange=etfs.exchange, datapoints=etfs_data)
+            self.publish_data(
+                symbol=ticker_only,
+                exchange=etfs.exchange,
+                name=etfs.name,
+                datapoints=etfs_data)
             time.sleep(random.randint(0, config.MAX_PAUSE_BETWEEN_REQUESTS))
 
-    def publish_data(self, symbol: str, exchange: str, datapoints: List[Dict[str, Any]]) -> None:
+    def publish_data(self, symbol: str, exchange: str, name: str, datapoints: List[Dict[str, Any]]) -> None:
         if not datapoints or len(datapoints) == 0:
             console.log(f"Warning! No datapoint for symbol {symbol} - nothing to publish.")
             return None
@@ -196,6 +210,7 @@ class InvestingAPItoKafka:
             bar["provider"] = "INVEST"
             bar["timeframe"] = "day"
             bar["symbol"] = symbol
+            bar["name"] = name
             bar["price_date"] = datetime.strptime(bar["Date"].split("T")[0], "%Y-%m-%d")
             del bar["Date"]
             bar["exchange"] = exchange
