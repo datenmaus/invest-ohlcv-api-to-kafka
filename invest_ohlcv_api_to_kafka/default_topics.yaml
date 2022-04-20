@@ -1,10 +1,4 @@
 invest-ohlcv-topics:
-  - 'invest.ohlcv.postgresql.mbpro'
-  - 'invest.ohlcv.postgresql.air'
-  - 'invest.ohlcv.postgresql.epyc'
-  - 'invest.ohlcv.clickhouse.mbpro'
-  - 'invest.ohlcv.clickhouse.air'
-  - 'invest.ohlcv.clickhouse.epyc'
   - 'timeseries.ohlcv.postgresql.mbpro'
   - 'timeseries.ohlcv.postgresql.air'
   - 'timeseries.ohlcv.postgresql.epyc'
