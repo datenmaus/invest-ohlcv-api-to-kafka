@@ -272,7 +272,8 @@ def main(start: str, end: str):
     console.log(f"Starting {os.path.basename(__file__)}")
     yesterday_dt: datetime = datetime.today() - timedelta(days=1)
     if not start and not end:
-        end = str(yesterday_dt.date())
+        # end = str(yesterday_dt.date())
+        end = str(datetime.today().date())
         one_week_ago = yesterday_dt - timedelta(weeks=1)
         start = str(one_week_ago.date())
     elif start and not end:
